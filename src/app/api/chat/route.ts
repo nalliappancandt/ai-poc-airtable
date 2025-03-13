@@ -245,8 +245,7 @@ export async function POST(req: NextRequest) {
     }
     const finalResponse = await ollama.chat({
       model: ollama_model,
-      messages,
-      temprature: 0.2
+      messages
     });
     return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
   } else {
