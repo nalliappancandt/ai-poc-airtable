@@ -35,7 +35,7 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
   let query = '';
 
   if(keyValues.length == 1){
-    query += encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
+    query += 'filterByFormula='+encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
   }else {
     query+='filterByFormula=AND(';
     const encodedQueries: any[] = [];
