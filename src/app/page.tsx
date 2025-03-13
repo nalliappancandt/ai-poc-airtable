@@ -75,7 +75,7 @@ const Page = () => {
       {isLoading && (
         <div className="text-left">
         <div className="inline-block p-3 rounded-2xl bg-gray-100 text-gray-400">
-          Thinking...
+          Thinking<span className="animate-pulse">...</span>
         </div>
         </div>
       )}

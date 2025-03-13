@@ -29,13 +29,19 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
   
   const keyValues = prepareQuery(args.skill);
   console.log(keyValues);
-  if(keyValues.length == 0){
+  if(keyValues.length == 0 || args.skill == ''){
     return [];
   }
   let query = '';
 
   if(keyValues.length == 1){
     query += encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
+  }else {
+    query+='filterByFormula=AND(';
+    keyValues.forEach((key) => {
+      query += encodeURI(`{${key}}>=1,`);
+    })
+    query+=')';
   }
   
   const apiKey = process.env.AIRTABLE_API_KEY;
@@ -71,7 +77,7 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
   
     const keyValues = prepareQuery(args.skills);
    
-    if(keyValues.length == 0){
+    if(keyValues.length == 0 || args.skills == ''){
       return [];
     }
   
@@ -80,7 +86,7 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
     if(keyValues.length == 1){
       query += encodeURI(`{${keyValues}}>=1`);
     } else {
-      query='AND(';
+      query+='AND(';
       keyValues.forEach((key) => {
         query += encodeURI(`{${key}}>=1,`);
       })
@@ -105,7 +111,7 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
   return await fetch(url, options)
       .then(response => response.json())
       .then(data => {
-      return data?.records.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
+      return data?.records?.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
       })
       .catch(error => console.error('Error:', error));
 }
@@ -114,7 +120,7 @@ async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: s
   
   const keyValues = prepareQuery(args.skills);
  
-  if(keyValues.length == 0){
+  if(keyValues.length == 0 || args.skills == ''){
     return [];
   }
   const yearOfExpList = args.yearOfExp.split(',');
@@ -148,7 +154,7 @@ async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: s
 return await fetch(url, options)
     .then(response => response.json())
     .then(data => {
-    return data?.records.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
+    return data?.records?.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
     })
     .catch(error => console.error('Error:', error));
 }
@@ -230,7 +236,7 @@ export async function POST(req: NextRequest) {
         console.log('Calling function:', tool.function.name);
         console.log('Arguments:', tool.function.arguments);
         const output = await functionToCall(tool.function.arguments);
-        messages.push(response.message, { role: 'tool', content: output.join(',') });
+        messages.push(response.message, { role: 'tool', content: output?.join(',') });
       } else {
         console.log('Function', tool.function.name, 'not found');
       }
@@ -239,7 +245,7 @@ export async function POST(req: NextRequest) {
     const finalResponse = await ollama.chat({
       model: ollama_model,
       messages,
-      temprature: 1
+      temprature: 0.2
     });
     return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
   } else {
