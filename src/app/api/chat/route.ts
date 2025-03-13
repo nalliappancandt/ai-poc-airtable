@@ -125,7 +125,7 @@ async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: s
   if(keyValues.length == 0 || args.skills == ''){
     return [];
   }
-  const yearOfExpList = args.yearOfExp.split(',');
+  const yearOfExpList = args.yearOfExp ? args.yearOfExp?.split(',') : [1];
   let query = 'filterByFormula=';
 
   if(keyValues.length == 1){
