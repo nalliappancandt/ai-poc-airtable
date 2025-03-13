@@ -29,17 +29,19 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
   
   const keyValues = prepareQuery(args.skill);
   console.log(keyValues);
-
+  if(keyValues.length == 0){
+    return [];
+  }
   let query = '';
 
   if(keyValues.length == 1){
-    query = encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
+    query += encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
   }
   
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID; 
   const tableId = process.env.AIRTABLE_TABLE_ID; 
-  const url = `https://api.airtable.com/v0/${baseId}/${tableId}?${query}&fields[]=Name`;
+  const url = `${process.env.AIRTABLE_API_URL}${baseId}/${tableId}?${query}&fields[]=Name`;
 
   console.log(url);
 
@@ -76,7 +78,7 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
     let query = 'filterByFormula=';
   
     if(keyValues.length == 1){
-      query = encodeURI(`{${keyValues}}>=1`);
+      query += encodeURI(`{${keyValues}}>=1`);
     } else {
       query='AND(';
       keyValues.forEach((key) => {
@@ -119,7 +121,7 @@ async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: s
   let query = 'filterByFormula=';
 
   if(keyValues.length == 1){
-    query = encodeURI(`{${keyValues}}>=${yearOfExpList[0]?yearOfExpList[0] : 1}`);
+    query += encodeURI(`{${keyValues}}>=${yearOfExpList[0]?yearOfExpList[0] : 1}`);
   } else {
     query='AND(';
     keyValues.forEach((key, index) => {
@@ -203,7 +205,6 @@ const callAirtableApiToolWithMultiSkillsExp = {
 
 
 export async function POST(req: NextRequest) {
-  
   const ollama_model = process.env.OLLAMA_MODEL;
   const { message } = await req.json();
 
@@ -211,45 +212,38 @@ export async function POST(req: NextRequest) {
   console.log('Prompt:', messages[0].content);
 
   const availableFunctions = {
-      callAirtableApi: callAirtableApi,
-      callAirtableApiMultiSkill: callAirtableApiMultiSkill,
-      callAirtableApiMultiSkillExp: callAirtableApiMultiSkillExp
+    callAirtableApi,
+    callAirtableApiMultiSkill,
+    callAirtableApiMultiSkillExp
   };
 
   const response = await ollama.chat({
-      model: ollama_model,
-      messages: messages,
-      tools: [callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp]
+    model: ollama_model,
+    messages,
+    tools: [callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp]
   });
 
-  let output: any;
   if (response.message.tool_calls) {
-      // Process tool calls from the response
-      for (const tool of response.message.tool_calls) {
-          const functionToCall = availableFunctions[tool.function.name];
-          if (functionToCall) {
-              console.log('Calling function:', tool.function.name);
-              console.log('Arguments:', tool.function.arguments);
-              output = await functionToCall(tool.function.arguments);
-              // Add the function response to messages for the model to use
-              messages.push(response.message);
-              messages.push({
-                  role: 'tool',
-                  content: output.join(','),
-              });
-          } else {
-              console.log('Function', tool.function.name, 'not found');
-          }
+    for (const tool of response.message.tool_calls) {
+      const functionToCall = availableFunctions[tool.function.name];
+      if (functionToCall) {
+        console.log('Calling function:', tool.function.name);
+        console.log('Arguments:', tool.function.arguments);
+        const output = await functionToCall(tool.function.arguments);
+        messages.push(response.message, { role: 'tool', content: output.join(',') });
+      } else {
+        console.log('Function', tool.function.name, 'not found');
       }
+    }
 
-      // Get final response from model with function outputs
-      const finalResponse = await ollama.chat({
-          model: ollama_model,
-          messages: messages,
-      });
-      return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
+    const finalResponse = await ollama.chat({
+      model: ollama_model,
+      messages,
+      temprature: 1
+    });
+    return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
   } else {
-      console.log('No tool calls returned from model');
+    console.log('No tool calls returned from model');
+    return NextResponse.json({ message: 'No tool calls returned from model' }, { status: 200 });
   }
-
 }
