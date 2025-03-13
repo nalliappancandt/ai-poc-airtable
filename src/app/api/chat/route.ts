@@ -38,10 +38,12 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
     query += encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
   }else {
     query+='filterByFormula=AND(';
+    const encodedQueries: any[] = [];
     keyValues.forEach((key) => {
-      query += encodeURI(`{${key}}>=1,`);
+      encodedQueries.push(encodeURI(`{${key}}>=1`))
     })
-    query+=')';
+    query += encodedQueries.join(',');
+    query +=')';
   }
   
   const apiKey = process.env.AIRTABLE_API_KEY;
@@ -63,9 +65,6 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
       .then(response => response.json())
       .then(data => {
       const developers = data.records;
-      /*const filteredDevelopers = developers.filter((developer: { fields: { [x: string]: number; }; }) => {
-          return developer.fields['Framework - Next.js'] !== undefined && developer.fields['Framework - Next.js'] >= args.yearOfExp;
-      });*/
       return developers.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
       })
       .catch(error => console.error('Error:', error));
@@ -87,10 +86,13 @@ async function callAirtableApi(args: { skill: string, yearOfExp: number }): Prom
       query += encodeURI(`{${keyValues}}>=1`);
     } else {
       query+='AND(';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const encodedQueries: any[] = [];
       keyValues.forEach((key) => {
-        query += encodeURI(`{${key}}>=1,`);
+        encodedQueries.push(encodeURI(`{${key}}>=1`))
       })
-      query+=')';
+      query += encodedQueries.join(',');
+      query +=')';
     }
     
     const apiKey = process.env.AIRTABLE_API_KEY;
@@ -130,9 +132,11 @@ async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: s
     query += encodeURI(`{${keyValues}}>=${yearOfExpList[0]?yearOfExpList[0] : 1}`);
   } else {
     query='AND(';
+    const encodedQueries: any[] = [];
     keyValues.forEach((key, index) => {
-      query += encodeURI(`{${key}}>=${yearOfExpList[index]?yearOfExpList[index] : 1},`);
+      encodedQueries.push(`{${key}}>=${yearOfExpList[index]?yearOfExpList[index] : 1}`);
     })
+    query += encodedQueries.join(',');
     query+=')';
   }
   
@@ -216,19 +220,16 @@ export async function POST(req: NextRequest) {
 
   const messages = [{ role: 'user', content: message }];
   console.log('Prompt:', messages[0].content);
-
   const availableFunctions = {
     callAirtableApi,
     callAirtableApiMultiSkill,
     callAirtableApiMultiSkillExp
   };
-
   const response = await ollama.chat({
     model: ollama_model,
     messages,
     tools: [callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp]
   });
-
   if (response.message.tool_calls) {
     for (const tool of response.message.tool_calls) {
       const functionToCall = availableFunctions[tool.function.name];
@@ -236,12 +237,12 @@ export async function POST(req: NextRequest) {
         console.log('Calling function:', tool.function.name);
         console.log('Arguments:', tool.function.arguments);
         const output = await functionToCall(tool.function.arguments);
+        console.log(output)
         messages.push(response.message, { role: 'tool', content: output?.join(',') });
       } else {
         console.log('Function', tool.function.name, 'not found');
       }
     }
-
     const finalResponse = await ollama.chat({
       model: ollama_model,
       messages,
