@@ -1,40 +1,123 @@
-<<<<<<< HEAD
-# ai-poc-airtable
-=======
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Getting Started
 
-## Getting Started
+### Airtable AI POC Chat
 
-First, run the development server:
+This web application allows you to interact with an LLM (Large Language Model) and the Airtable API to retrieve candidate information based on specific queried skill sets. The application is built using Next.js and leverages the Ollama model through function tools to facilitate communication between the app, the Llama model, and the Airtable API.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Overview
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+In this application, you can:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Query the Airtable database for candidates with specific skills.
+- Use an LLM model (powered by Ollama) to interpret natural language queries and translate them into Airtable API calls.
+- Easily retrieve candidate data based on skills, experience, certifications, and more.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The stack includes:
 
-## Learn More
+- **Frontend:** Next.js (React-based)
+- **LLM:** Ollama 
+- **Datasource:** Airtable API
 
-To learn more about Next.js, take a look at the following resources:
+## Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Before you begin, ensure you have the following prerequisites installed:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Node.js** (for running the Next.js application)
+- **Ollama** (for AI model interaction)
+- **Airtable API Key** (for accessing your Airtable database)
 
-## Deploy on Vercel
+## Installing Ollama
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To install Ollama, follow these steps:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
->>>>>>> 7ea8dbd (Initial commit from Create Next App)
+1. **Download the Installer**  
+   Visit the [Ollama website](https://ollama.com) and download the installer for your operating system.
+
+2. **Run the Installer**  
+   Open the downloaded file and follow the on-screen instructions to complete the installation process.
+
+3. **Verify Installation**  
+   After installation, open a terminal and run the following command to verify that Ollama is installed correctly:
+
+   ```bash
+   ollama --version
+   ```
+
+## Installing Ollama Model
+
+1. **Choose the model**
+
+    Refer to the [Ollama Model Library](https://ollama.com/library) to find the model you want to install.
+
+2. **Run and Install Model**
+
+    To run the llama3.2 model, for instance, execute the following command:
+
+    ```bash
+    ollama run llama3.2
+    ```
+
+## Installation of Web Application 
+
+
+1. **Clone the Repository**
+
+    To get the latest code for this project, follow the instructions below
+
+    Use the following command to clone the repository:
+
+    ```bash
+    git clone https://github.com/nalliappancandt/ai-poc-airtable.git
+    ```
+
+2. **Configuring Airtable API KEY and Other Table configurations**
+
+    Please update following environment variables into .env file.
+
+    ```bash
+    AIRTABLE_API_KEY=XXXX
+    AIRTABLE_BASE_ID=YYYY
+    AIRTABLE_TABLE_ID=ZZZZ
+    AIRTABLE_API_URL=XXXX
+    ```
+
+3. **Update Ollama Model**
+
+    Please update following environment variables into .env file.
+
+    ```bash
+    OLLAMA_MODEL=llama3.1:8b
+    ```
+
+4. **Running the Application**
+
+    First, run the development server:
+
+    ```bash
+    npm run dev
+    # or
+    yarn dev
+    # or
+    pnpm dev
+    # or
+    bun dev
+    ```
+
+    The application will now be running locally. Open your browser and go to:
+
+    http://localhost:3000
+
+    You should now see the chat window where you can interact with the system and query candidates based on different skill sets.
+
+## Testing the Application
+
+    Once the application is running, you can test the functionality by entering queries in the chat window such as:
+
+    1. Find the developer with Next.js skills and two years of experience.
+    2. Find the candidate with Next.js skills and five years of experience.
+    3. List the people who have AWS certifications.
+    4. List the people with Python skills who also know React.
+
+## Example Screenshot
+
+![alt text](image.png)
