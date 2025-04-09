@@ -1,7 +1,7 @@
 'use client';
 
 import {  Suspense } from 'react'
-import RenderStreamData from './components/RenderStreamData';
+import RenderStreamData from '../components/RenderStreamData';
 
 
 export default function ReadingStreamingData() {

@@ -1,6 +1,8 @@
 import ollama from "ollama";
 import { NextRequest, NextResponse } from "next/server";
 import fieldsKeys from "@/app/utils/fieldKeys";
+import { streamingJsonResponse } from "@/app/shared/server/streaming";
+import { sleep } from "openai/core.mjs";
 
 const prepareQuery = (skill: string) => {
   let skillsList: string[] = [];
@@ -218,8 +220,9 @@ export async function POST(req: NextRequest) {
   const ollama_model = process.env.OLLAMA_MODEL;
   const { message } = await req.json();
 
-  const messages = [{ role: 'user', content: message }];
-  console.log('Prompt:', messages[0].content);
+  const messages = [
+  { role: 'system', content: 'You are an Airtable chat bot to retrieve the employees based on matching skill set and return their names as a comma-separated list to the user.' }, { role: 'user', content: message }];
+ // console.log('Prompt:', messages);
   const availableFunctions = {
     callAirtableApi,
     callAirtableApiMultiSkill,
@@ -234,10 +237,10 @@ export async function POST(req: NextRequest) {
     for (const tool of response.message.tool_calls) {
       const functionToCall = availableFunctions[tool.function.name];
       if (functionToCall) {
-        console.log('Calling function:', tool.function.name);
-        console.log('Arguments:', tool.function.arguments);
+       // console.log('Calling function:', tool.function.name);
+       // console.log('Arguments:', tool.function.arguments);
         const output = await functionToCall(tool.function.arguments);
-        console.log(output)
+       // console.log(output)
         messages.push(response.message, { role: 'tool', content: output?.join(',') });
       } else {
         console.log('Function', tool.function.name, 'not found');
@@ -245,9 +248,20 @@ export async function POST(req: NextRequest) {
     }
     const finalResponse = await ollama.chat({
       model: ollama_model,
-      messages
+      messages,
+      stream: true,
     });
-    return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
+    return streamingJsonResponse( (async function*() {
+            // yield* fetchItems(completion2);
+            for await (const chunk of finalResponse) {
+             //console.log(chunk,":: Message Content");
+             await sleep(100);
+             yield {
+               ...chunk?.message //.choices[0]?.delta
+             };
+           }
+           })() );
+   // return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
   } else {
     console.log('No tool calls returned from model');
     return NextResponse.json({ message: 'No tool calls returned from model' }, { status: 200 });
