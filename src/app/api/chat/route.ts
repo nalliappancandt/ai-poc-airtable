@@ -1,269 +1,93 @@
 import ollama from "ollama";
 import { NextRequest, NextResponse } from "next/server";
-import fieldsKeys from "@/app/utils/fieldKeys";
 import { streamingJsonResponse } from "@/app/shared/server/streaming";
-import { sleep } from "openai/core.mjs";
+import { callAirtableApi, callAirtableApiMultiSkill, callAirtableApiMultiSkillExp } from "@/app/tools/airtable-service";
+import { callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp } from "@/app/tools/config";
 
-const prepareQuery = (skill: string) => {
-  let skillsList: string[] = [];
-  if (skill.includes(',')) {
-    skillsList = skill.split(',').map(s => s.trim());
-  } else if (skill.toLowerCase().includes('and')) {
-    skillsList = skill.split('and').map(s => s.trim());
-  } else {
-    skillsList = [skill.trim()];
-  }
+const ollamaModel = process.env.OLLAMA_MODEL;
 
-  if (skillsList.length > 1) {
-    return fieldsKeys.filter(item => 
-      skillsList.some(key => 
-        item.toLowerCase().includes(key.toLowerCase())
-      )
-    );
-  } else {
-    return fieldsKeys.filter(item => 
-      item.toLowerCase().includes(skillsList[0].toLowerCase())
-    );
-  }
-}
+const SYSTEM_PROMPT = `You are an AI assistant integrated with Airtable. 
+Your primary function is to retrieve employee records based on a given skill set. 
+When a user provides a skill or list of skills, query the Airtable database to find employees whose skills match the input. 
+Return the matching employee names as a list.
+----------------
+You should only summarize the results based on the function tool results.
+----------------
+You should not fetch directly from the Airtable database.
+----------------
+You are not allowed to answer any other questions or provide any other information outside of the Airtable query results.
+----------------
+Result Format: Each name should be on a new line.
+1. Candidate Name,
+2. Candidate Name,
+3. Candidate Name.
+----------------
+you should display the result based on tool prompt and summarize it.
+----------------
+you should not display python code only text message.
+----------------`;
 
-async function callAirtableApi(args: { skill: string, yearOfExp: number }): Promise<any> {
-  
-  const keyValues = prepareQuery(args.skill);
-  console.log(keyValues);
-  if(keyValues.length == 0 || args.skill == ''){
-    return [];
-  }
-  let query = '';
-
-  if(keyValues.length == 1){
-    query += 'filterByFormula='+encodeURI(`{${keyValues}}=${args.yearOfExp ? args.yearOfExp : 1}`);
-  }else {
-    query+='filterByFormula=AND(';
-    const encodedQueries: any[] = [];
-    keyValues.forEach((key) => {
-      encodedQueries.push(encodeURI(`{${key}}>=1`))
-    })
-    query += encodedQueries.join(',');
-    query +=')';
-  }
-  
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID; 
-  const tableId = process.env.AIRTABLE_TABLE_ID; 
-  const url = `${process.env.AIRTABLE_API_URL}${baseId}/${tableId}?${query}&fields[]=Name`;
-
-  console.log(url);
-
-  const options = {
-  method: 'GET',
-  headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-  }
-  };
-
-  return await fetch(url, options)
-      .then(response => response.json())
-      .then(data => {
-      const developers = data.records;
-      return developers.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
-      })
-      .catch(error => console.error('Error:', error));
- }
-
-
-
-  async function callAirtableApiMultiSkill(args: { skills: string}): Promise<any> {
-  
-    const keyValues = prepareQuery(args.skills);
-   
-    if(keyValues.length == 0 || args.skills == ''){
-      return [];
-    }
-  
-    let query = 'filterByFormula=';
-  
-    if(keyValues.length == 1){
-      query += encodeURI(`{${keyValues}}>=1`);
-    } else {
-      query+='AND(';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const encodedQueries: any[] = [];
-      keyValues.forEach((key) => {
-        encodedQueries.push(encodeURI(`{${key}}>=1`))
-      })
-      query += encodedQueries.join(',');
-      query +=')';
-    }
-    
-    const apiKey = process.env.AIRTABLE_API_KEY;
-    const baseId = process.env.AIRTABLE_BASE_ID; 
-    const tableId = process.env.AIRTABLE_TABLE_ID; 
-    const url = `${process.env.AIRTABLE_API_URL}${baseId}/${tableId}?${query}&fields[]=Name`;
-  
-    console.log(url);
-  
-    const options = {
-    method: 'GET',
-    headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-    }
-    };
-
-  return await fetch(url, options)
-      .then(response => response.json())
-      .then(data => {
-      return data?.records?.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
-      })
-      .catch(error => console.error('Error:', error));
-}
-
-async function callAirtableApiMultiSkillExp(args: { skills: string, yearOfExp: string}): Promise<any> {
-  
-  const keyValues = prepareQuery(args.skills);
- 
-  if(keyValues.length == 0 || args.skills == ''){
-    return [];
-  }
-  const yearOfExpList = args.yearOfExp ? args.yearOfExp?.split(',') : [1];
-  let query = 'filterByFormula=';
-
-  if(keyValues.length == 1){
-    query += encodeURI(`{${keyValues}}>=${yearOfExpList[0]?yearOfExpList[0] : 1}`);
-  } else {
-    query='AND(';
-    const encodedQueries: any[] = [];
-    keyValues.forEach((key, index) => {
-      encodedQueries.push(`{${key}}>=${yearOfExpList[index]?yearOfExpList[index] : 1}`);
-    })
-    query += encodedQueries.join(',');
-    query+=')';
-  }
-  
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID; 
-  const tableId = process.env.AIRTABLE_TABLE_ID; 
-  const url = `${process.env.AIRTABLE_API_URL}${baseId}/${tableId}?${query}&fields[]=Name`;
-
-  console.log(url);
-
-  const options = {
-  method: 'GET',
-  headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-  }
-  };
-
-return await fetch(url, options)
-    .then(response => response.json())
-    .then(data => {
-    return data?.records?.map((data: { fields: { [x: string]: any; Name: string; }; }) => `${data.fields.Name.split('|')[0]}`)
-    })
-    .catch(error => console.error('Error:', error));
-}
-
-// Tool definition for callAirtableApiTool function
-const callAirtableApiTool = {
-type: 'function',
-function: {
-  name: 'callAirtableApi',
-  description: 'Search Employee with matching skill set',
-  parameters: {
-      type: 'object',
-      required: ['skill', 'yearOfExp'],
-      properties: {
-          skill: { type: 'string', description: 'Skill requested' },
-          yearOfExp: { type: 'number', description: 'Year of experience' }
-      }
-  }
-}
+const availableFunctions: Record<string, (args: any) => Promise<any>> = {
+  callAirtableApi,
+  callAirtableApiMultiSkill,
+  callAirtableApiMultiSkillExp,
 };
 
-// Tool definition for subtract function
-const callAirtableApiToolWithMultiSkills = {
-  type: 'function',
-  function: {
-    name: 'callAirtableApiMultiSkill',
-    description: 'Search Employee with matching skills set',
-    parameters: {
-        type: 'object',
-        required: ['skills'],
-        properties: {
-            skills: { type: 'string', description: 'Comma seprated string of skills' }
-        }
-    }
-  }
-  };
-
-// Tool definition for subtract function
-const callAirtableApiToolWithMultiSkillsExp = {
-  type: 'function',
-  function: {
-    name: 'callAirtableApiMultiSkillExp',
-    description: 'Search Employee with matching skills and experience',
-    parameters: {
-        type: 'object',
-        required: ['skills', 'yearOfExp'],
-        properties: {
-            skills: { type: 'string', description: 'Comma seprated string of skills' },
-            yearOfExp: { type: 'string', description: 'Comma seprated numbers for each skill' }
-        }
-    }
-  }
-  };
-
-
 export async function POST(req: NextRequest) {
-  const ollama_model = process.env.OLLAMA_MODEL;
-  const { message } = await req.json();
+  try {
+    const { message } = await req.json();
 
-  const messages = [
-  { role: 'system', content: 'You are an Airtable chat bot to retrieve the employees based on matching skill set and return their names as a comma-separated list to the user.' }, { role: 'user', content: message }];
- // console.log('Prompt:', messages);
-  const availableFunctions = {
-    callAirtableApi,
-    callAirtableApiMultiSkill,
-    callAirtableApiMultiSkillExp
-  };
-  const response = await ollama.chat({
-    model: ollama_model,
-    messages,
-    tools: [callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp]
-  });
-  if (response.message.tool_calls) {
-    for (const tool of response.message.tool_calls) {
-      const functionToCall = availableFunctions[tool.function.name];
-      if (functionToCall) {
-       // console.log('Calling function:', tool.function.name);
-       // console.log('Arguments:', tool.function.arguments);
-        const output = await functionToCall(tool.function.arguments);
-       // console.log(output)
-        messages.push(response.message, { role: 'tool', content: output?.join(',') });
-      } else {
-        console.log('Function', tool.function.name, 'not found');
-      }
-    }
-    const finalResponse = await ollama.chat({
-      model: ollama_model,
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: message },
+    ];
+
+    const response = await ollama.chat({
+      model: ollamaModel || "default_model",
       messages,
-      stream: true,
+      tools: [callAirtableApiTool, callAirtableApiToolWithMultiSkills, callAirtableApiToolWithMultiSkillsExp],
     });
-    return streamingJsonResponse( (async function*() {
-            // yield* fetchItems(completion2);
-            for await (const chunk of finalResponse) {
-             //console.log(chunk,":: Message Content");
-             await sleep(100);
-             yield {
-               ...chunk?.message //.choices[0]?.delta
-             };
-           }
-           })() );
-   // return NextResponse.json({ message: finalResponse.message.content }, { status: 200 });
-  } else {
-    console.log('No tool calls returned from model');
-    return NextResponse.json({ message: 'No tool calls returned from model' }, { status: 200 });
+
+    if (response.message.tool_calls) {
+      await handleToolCalls(response.message.tool_calls, messages);
+
+      const finalResponse = await ollama.chat({
+        model: ollamaModel || "default_model",
+        messages,
+        stream: true,
+      });
+
+      return streamingJsonResponse(streamResponse(finalResponse));
+    } else {
+      console.log("No tool calls returned from model");
+      return NextResponse.json({ message: "No tool calls returned from model" }, { status: 200 });
+    }
+  } catch (error) {
+    console.error("Error in POST handler:", error);
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+async function handleToolCalls(toolCalls: any[], messages: any[]) {
+  for (const tool of toolCalls) {
+    const functionToCall = availableFunctions[tool.function.name];
+    if (functionToCall) {
+      console.log("Calling function:", tool.function.name);
+      console.log("Arguments:", tool.function.arguments);
+
+      const output = await functionToCall(tool.function.arguments);
+      console.log(output);
+
+      const toolResponse = output.length === 0 ? "There is no matching profile." : output.join(",");
+      messages.push({ role: "tool", content: toolResponse });
+    } else {
+      console.log("Function", tool.function.name, "not found");
+    }
+  }
+}
+
+async function* streamResponse(finalResponse: AsyncIterable<any>) {
+  for await (const chunk of finalResponse) {
+    yield { ...chunk?.message };
   }
 }
